@@ -20,7 +20,12 @@ $scPwd = "YOUR_PASSWORD"; // your senscritique password
  - you can uncomment the following line if you are processing a large file
 ```php
 ini_set('max_execution_time', 0);
- ```
+```
+ 
+### Note
+
+Script execution can take a while
+ 
 ### Credits
  - script logic by [Bahanix](https://github.com/Bahanix)
  - simple_html_dom by [samacs](https://github.com/samacs)
