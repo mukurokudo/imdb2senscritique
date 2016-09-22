@@ -15,6 +15,7 @@ function senscritiquePost($url, $postedData, $scRoot, $cookiePath){
     $headers = array(
         "Origin: $scRoot",
         "Accept-Language: en-US,en;q=0.8,fr;q=0.6",
+        "Accept:application/json, text/javascript, */*; q=0.01",
         "Referer: $scRoot/",
         "X-Requested-With: XMLHttpRequest",
         "Connection: keep-alive",
