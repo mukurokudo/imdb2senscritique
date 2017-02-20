@@ -15,7 +15,7 @@ $scPwd = "YOUR_PASSWORD"; // your SC password
 $forceUpdate = false; // if true, will update even if movie have already been rated
 
 // generic vars
-$scRoot = "http://www.senscritique.com";
+$scRoot = "https://www.senscritique.com";
 $cookiePath = "./this_cookie";
 $scCredentials = array('email'=>$scEmail,'pass'=>$scPwd);
 $scConnectURI = $scRoot."/sc2/auth/login.json";
