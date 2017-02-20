@@ -1,31 +1,20 @@
 # imdb2senscritique
 
-A PHP script updating your [SensCritique](http://www.senscritique.com/) ratings based on an [IMDB](http://www.imdb.com/) export.
-
-### requirements
-
-A running PHP 5+ server with CURL
+A PHP script updating your [SensCritique](http://www.senscritique.com/) ratings based on a [IMDB](http://www.imdb.com/)-export CSV file.
 
 ### Usage
 
- - install these files
- - export the IMDB list you want by clicking onto the button "Export this list" at the end of your IMDB list
- - move the generated csv file into the /web folder
- - update the following 3 variables in the imdb2senscritique.php file : 
-```php
-$imdbRatings = "./web/exempleFile.csv"; // the filePath of the imdb generated file
-$scEmail = "YOUR_EMAIL_ADDRESS"; // your senscritique email
-$scPwd = "YOUR_PASSWORD"; // your senscritique password
-```
- - you can uncomment the following line if you are processing a large file
-```php
-ini_set('max_execution_time', 0);
-```
- 
-### Note
+- Copy the files on a server (with PHP5+ and CURL).
+- Visit `/imdb2senscritique.php`.
 
-Script execution can take a while
- 
+### Settings
+
+- **IMDB file** : a CSV file in IMDB-export format, exported from IMDB or converted with [imdbify](https://github.com/nliautaud/moviescheckstools#imdbify).
+- **Start item** : number of the first item to process.
+- **Item number** : number of items to process. Several hundreds of items can take a while. Lower the value in case of server timeout.
+- **SC email / password** : email and password registered on SensCritique.
+- **Overwrite** : update existing ratings with new ones. Disable to add only new ones.
+
 ### Credits
- - script logic by [Bahanix](https://github.com/Bahanix)
+ - script logic by [phorque](https://github.com/phorque) / [Bahanix](https://github.com/Bahanix) / [mukurokudo](https://github.com/mukurokudo)
  - simple_html_dom by [samacs](https://github.com/samacs)
