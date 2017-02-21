@@ -48,7 +48,7 @@ function parseCSV($path) {
     while (($row = fgetcsv($fHandle)) && $curr < $max) {
         if($curr >= $params->start) {
             $row = array_map( "iconvutf8", $row );
-            parseMovie($curr, $row[5], $row[11], $row[8]);
+            parseMovie($curr, $row[5], $row[11], $row[8], $row[2]);
         }
         $curr++;
     }
@@ -79,26 +79,25 @@ function getMovie($resultsPage, $title, $year, $rating) {
     }
 }
 function getCurrentRating($sc, $movieId) {
-    $getUserActions = senscritiquePost($sc->root.$sc->actionsPath, "productIdCollections%5B%5D=$movieId", $sc->root, $sc->cookiePath);
+    $getUserActions = senscritiquePost($sc, $sc->actionsPath, "productIdCollections%5B%5D=$movieId");
     $getUserActionsArray = json_decode($getUserActions['data']);
     return $getUserActionsArray->json->collectionsRatings->$movieId->rating;
 }
 function postRating($sc, $movieId, $rating) {
-    $scRateMovieURI = $sc->root."/collections/rate/$movieId.json";
-    $return = senscritiquePost($scRateMovieURI, array('rating'=>$rating), $sc->root, $sc->cookiePath);
+    $return = senscritiquePost($sc, "/collections/rate/$movieId.json", array('rating'=>$rating));
     if($return['httpCode'] === 200 && $return['data'] !== ''){
         $thisReturn = json_decode($return['data']);
         return $thisReturn->json->success;
     }
 }
 
-function parseMovie($pos, $title, $year, $rating) {
+function parseMovie($pos, $title, $year, $rating, $date) {
     global $params;
     global $stats;
     global $sc;
 
     $scFindMovieURI = $sc->root."/recherche?query=".urlencode(strtolower($title))."&filter=movies";
-    $scFindResults = senscritiqueGet($scFindMovieURI, $sc->root, $sc->cookiePath);
+    $scFindResults = senscritiqueGet($sc, $scFindMovieURI);
 
     $movie = getMovie($scFindResults['data'], $title, $year, $rating);
 
@@ -106,6 +105,7 @@ function parseMovie($pos, $title, $year, $rating) {
         return $stats->notFound[] = $title;
 
     $movie->pos = $pos;
+    $movie->date = date("Y-m-d", strtotime($date));
 
     if(!$params->over)
         $movie->currentRating = getCurrentRating($sc, $movie->id);
@@ -114,14 +114,20 @@ function parseMovie($pos, $title, $year, $rating) {
         return $stats->skipped[] = $movie;
 
     $success = postRating($sc, $movie->id, $rating);
-    if($success) return $stats->updated[] = $movie;
+    if($success) {
+        senscritiquePost($sc, '/collections/datedone/'.$movie->id.'.json', array(
+            'date_done' => $movie->date,
+            'save' => true));
+        $stats->updated[] = $movie;
+        return;
+    }
 
     $stats->failed[] = $title;
 }
 
 
 if($params->mail) {
-    $scConnect = senscritiquePost($sc->root.$sc->loginPath, $sc->credentials,$sc->root,$sc->cookiePath);
+    $scConnect = senscritiquePost($sc, $sc->loginPath, $sc->credentials);
     if($scConnect['httpCode'] === 200 && $scConnect['data'] !== ''){
         $connectReturn = json_decode($scConnect['data']);
         if($connectReturn->json->success === true)
@@ -200,9 +206,9 @@ if($params->mail) {
     <p><strong><?php echo $count;?> titles where successfully updated</strong></p>
     <ul><?php
     foreach($stats->updated as $movie) {
-        $updateinfos = sprintf('<span class="alert alert-success">updated %s to %d</span>',
+        $updateinfos = sprintf('<span class="alert alert-success">updated %s to <strong>%d</strong> at date <em>%s</em></span>',
             isset($movie->currentRating) ? 'from '.$movie->currentRating : '',
-            $movie->rating);
+            $movie->rating, $movie->date);
         $originalinfos = sprintf('<span class="alert alert-warning">seems to be <em>%s</em> %s</span>',
             $movie->title == $movie->foundtitle ? '' : $movie->title.',',
             $movie->year);

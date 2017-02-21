@@ -1,17 +1,16 @@
 <?php
 
 /**
+ * @param object $sc
  * @param string $url
- * @param string $scRoot
- * @param string $cookiePath
  *
  * @return array HTTP code & CURL output
  */
-function senscritiqueGet($url, $scRoot, $cookiePath){
+function senscritiqueGet($sc, $url){
     $headers = array(
-        "Origin: $scRoot",
+        "Origin: $sc->root",
         "Accept-Language: en-US,en;q=0.8,fr;q=0.6",
-        "Referer: $scRoot/",
+        "Referer: $sc->root/",
         "Connection: keep-alive",
         "Upgrade-Insecure-Requests: 1",
         "Cache-Control: max-age=0",
@@ -26,9 +25,9 @@ function senscritiqueGet($url, $scRoot, $cookiePath){
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($ch, CURLOPT_VERBOSE, 0); // --no-verbose
 
-    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookiePath); // --keep-session-cookies
-    curl_setopt($ch, CURLOPT_COOKIEJAR, $cookiePath); // --save-cookies
-    curl_setopt($ch, CURLOPT_COOKIE, $cookiePath); // --load-cookies
+    curl_setopt($ch, CURLOPT_COOKIEFILE, $sc->cookiePath); // --keep-session-cookies
+    curl_setopt($ch, CURLOPT_COOKIEJAR, $sc->cookiePath); // --save-cookies
+    curl_setopt($ch, CURLOPT_COOKIE, $sc->cookiePath); // --load-cookies
 
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 

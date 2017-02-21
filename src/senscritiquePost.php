@@ -3,26 +3,25 @@
 /**
  * Calling senscritique API in POST mode
  *
- * @param string $url
+ * @param object $sc
+ * @param string $path
  * @param array  $postedData
- * @param string $scRoot
- * @param string $cookiePath
  *
  * @return array HTTP code, CURL output & cookie path
  */
-function senscritiquePost($url, $postedData, $scRoot, $cookiePath){
+function senscritiquePost($sc, $path, $postedData){
 
     $headers = array(
-        "Origin: $scRoot",
+        "Origin: ".$sc->root,
         "Accept-Language: en-US,en;q=0.8,fr;q=0.6",
         "Accept:application/json, text/javascript, */*; q=0.01",
-        "Referer: $scRoot/",
+        "Referer: ".$sc->root."/",
         "X-Requested-With: XMLHttpRequest",
         "Connection: keep-alive",
     );
 
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_URL, $sc->root.$path);
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postedData);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0); // don't check certificate
@@ -30,9 +29,9 @@ function senscritiquePost($url, $postedData, $scRoot, $cookiePath){
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($ch, CURLOPT_VERBOSE, 0); // --no-verbose
 
-    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookiePath); // --keep-session-cookies
-    curl_setopt($ch, CURLOPT_COOKIEJAR, $cookiePath); // --save-cookies
-    curl_setopt($ch, CURLOPT_COOKIE, $cookiePath); // --load-cookies
+    curl_setopt($ch, CURLOPT_COOKIEFILE, $sc->cookiePath); // --keep-session-cookies
+    curl_setopt($ch, CURLOPT_COOKIEJAR, $sc->cookiePath); // --save-cookies
+    curl_setopt($ch, CURLOPT_COOKIE, $sc->cookiePath); // --load-cookies
 
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
@@ -44,6 +43,6 @@ function senscritiquePost($url, $postedData, $scRoot, $cookiePath){
     return array(
         'httpCode' => $httpCode,
         'data' => $thisOutput,
-        'cookiePath' => $cookiePath
+        'cookiePath' => $sc->cookiePath
     );
 }
