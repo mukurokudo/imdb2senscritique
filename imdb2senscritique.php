@@ -33,6 +33,9 @@ $stats = (object) array(
     'notFound'=>array(),
 );
 
+function iconvutf8( $str ) {
+    return iconv( "Windows-1252", "UTF-8", $str );
+}
 function parseCSV($path) {
     global $params;
     if (!file_exists($path))
@@ -43,6 +46,7 @@ function parseCSV($path) {
     $curr = 0;
     $max = $params->start + $params->nbr;
     while (($row = fgetcsv($fHandle)) && $curr < $max) {
+        $row = array_map( "iconvutf8", $row );
         if($curr >= $params->start)
             parseMovie($row[5], $row[11], $row[8]);
         $curr++;
