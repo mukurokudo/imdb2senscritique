@@ -46,11 +46,13 @@ function parseCSV($path) {
     $curr = 0;
     $max = $params->start + $params->nbr;
     while (($row = fgetcsv($fHandle)) && $curr < $max) {
-        $row = array_map( "iconvutf8", $row );
-        if($curr >= $params->start)
-            parseMovie($row[5], $row[11], $row[8]);
+        if($curr >= $params->start) {
+            $row = array_map( "iconvutf8", $row );
+            parseMovie($curr, $row[5], $row[11], $row[8]);
+        }
         $curr++;
     }
+    return $curr;
 }
 function getMovie($resultsPage, $title, $year, $rating) {
     $items = str_get_html($resultsPage)->find('li.esco-item');
@@ -70,7 +72,7 @@ function getMovie($resultsPage, $title, $year, $rating) {
             'id' => $item->getAttribute('data-sc-product-id'),
             'foundtitle' => $thisTitle,
             'foundotitle' => $thisOTitle,
-            'foundyear' => $thisYear ? $thisYear  : '???',
+            'foundyear' => $thisYear,
             //'currentRating' => $item->find('span.erra-action-item', 0)->plaintext,
             'path' => $item->find('a', 0)->href,
             'img' => $item->find('img', 0),
@@ -91,7 +93,7 @@ function postRating($sc, $movieId, $rating) {
     }
 }
 
-function parseMovie($title, $year, $rating) {
+function parseMovie($pos, $title, $year, $rating) {
     global $params;
     global $stats;
     global $sc;
@@ -103,6 +105,8 @@ function parseMovie($title, $year, $rating) {
 
     if (!$movie || !$movie->id)
         return $stats->notFound[] = $title;
+
+    $movie->pos = $pos;
 
     // TODO : should be possible to get that from the find page, see @getMovie
     if(!$params->over)
@@ -123,7 +127,7 @@ if($params->mail) {
     if($scConnect['httpCode'] === 200 && $scConnect['data'] !== ''){
         $connectReturn = json_decode($scConnect['data']);
         if($connectReturn->json->success === true)
-            parseCSV($filepath);
+            $totalCount = parseCSV($filepath);
         else die('connection to SC failed : wrong credentials');
     }
     else die('connection to SC failed : '.$scConnect['httpCode']);
@@ -191,6 +195,9 @@ if($params->mail) {
 </form>
 <hr>
 <section>
+<?php if ($totalCount): ?>
+<h2>Titles <?php echo $params->start; ?>-<?php echo $params->start+$params->nbr; ?> (out of <?php echo $totalCount; ?>)</h2><hr>
+<?php endif; ?>
 <?php if ($count = count($stats->updated)): ?>
     <p><strong><?php echo $count;?> titles where successfully updated</strong></p>
     <ul><?php
@@ -201,7 +208,8 @@ if($params->mail) {
         $originalinfos = sprintf('<span class="alert alert-warning">seems to be <em>%s</em> %s</span>',
             $movie->title == $movie->foundtitle ? '' : $movie->title.',',
             $movie->year);
-        printf('<li><a href="%s">%s (%s)</a> %s %s</li>',
+        printf('<li>#%d - <a href="%s">%s (%s)</a> %s %s</li>',
+            $movie->pos,
             $sc->root . $movie->path,
             $movie->foundtitle,
             $movie->foundyear,
@@ -216,7 +224,8 @@ if($params->mail) {
     <p><strong><?php echo $count;?> titles where skipped because already rated</strong></p>
     <ul><?php
     foreach($stats->skipped as $movie)
-        printf('<li><a href="%s">%s (%s)</a> <span class="alert alert-info">already rated %d %s</span></li>',
+        printf('<li>#%d - <a href="%s">%s (%s)</a> <span class="alert alert-info">already rated %d %s</span></li>',
+            $movie->pos,
             $sc->root . $movie->path,
             $movie->title, $movie->year,
             $movie->currentRating,
