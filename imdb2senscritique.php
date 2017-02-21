@@ -73,7 +73,6 @@ function getMovie($resultsPage, $title, $year, $rating) {
             'foundtitle' => $thisTitle,
             'foundotitle' => $thisOTitle,
             'foundyear' => $thisYear,
-            //'currentRating' => $item->find('span.erra-action-item', 0)->plaintext,
             'path' => $item->find('a', 0)->href,
             'img' => $item->find('img', 0),
         );
@@ -108,7 +107,6 @@ function parseMovie($pos, $title, $year, $rating) {
 
     $movie->pos = $pos;
 
-    // TODO : should be possible to get that from the find page, see @getMovie
     if(!$params->over)
         $movie->currentRating = getCurrentRating($sc, $movie->id);
 
