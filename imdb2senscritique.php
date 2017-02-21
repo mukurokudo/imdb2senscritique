@@ -3,6 +3,9 @@ require_once "./src/simple_html_dom.php";
 require_once "./src/senscritiquePost.php";
 require_once "./src/senscritiqueGet.php";
 
+// error_reporting(E_ALL);
+// ini_set('display_errors', 'on');
+
 $filepath = 'movies.csv';
 $uploaded = $_FILES['file']['tmp_name'];
 if($uploaded) move_uploaded_file($uploaded, $filepath);
@@ -25,10 +28,9 @@ $sc = (object) array(
 );
 $stats = (object) array(
     'updated'=>array(),
-    'failed'=>0,
+    'failed'=>array(),
     'skipped'=>array(),
     'notFound'=>array(),
-    'lines'=>array(),
 );
 
 function parseCSV($path) {
@@ -46,23 +48,28 @@ function parseCSV($path) {
         $curr++;
     }
 }
-function getMovieID($resultsPage, $title, $year) {
-    $html = str_replace('\n\r','',$resultsPage);
-    $movies = str_get_html($html)->find('li.esco-item');
-    foreach($movies as $movie){
-        $movieRaw = str_get_html($movie->outerText());
+function getMovie($resultsPage, $title, $year, $rating) {
+    $item = str_get_html($resultsPage)->find('li.esco-item', 0);
+    if(!$item) return null;
 
-        $id = $movie->getAttribute('data-sc-product-id');
+    $thisTitle = html_entity_decode($item->find('a.elco-anchor',0)->plaintext, ENT_QUOTES);
+    $thisOTitle = html_entity_decode($item->find('p.elco-original-title',0)->plaintext, ENT_QUOTES);
+    $thisYear = substr(trim($item->find('span.elco-date',0)->plaintext), 1, -1);
 
-        $thisTitle = html_entity_decode($movieRaw->find('a.elco-anchor',0)->plaintext, ENT_QUOTES);
-        $originalTitle = html_entity_decode($movieRaw->find('p.elco-original-title',0)->plaintext, ENT_QUOTES);
-        $thisYear = str_replace(array('(',')',' '), '', $movieRaw->find('span.elco-date',0)->plaintext);
-        $isCloseYear = abs(intval($thisYear) - intval($year)) < 2;
+    $movie = (object) array(
+        'title' => $title,
+        'year' => $year,
+        'rating' => $rating,
+        'id' => $item->getAttribute('data-sc-product-id'),
+        'foundtitle' => $thisTitle,
+        'foundotitle' => $thisOTitle,
+        'foundyear' => $thisYear ? $thisYear  : '???',
+        //'currentRating' => $item->find('span.erra-action-item', 0)->plaintext,
+        'path' => $item->find('a', 0)->href,
+        'img' => $item->find('img', 0),
+    );
 
-        if (($originalTitle == $title || $thisTitle == $title) && $isCloseYear) {
-            return $id;
-        }
-    }
+    return $movie;
 }
 function getCurrentRating($sc, $movieId) {
     $getUserActions = senscritiquePost($sc->root.$sc->actionsPath, "productIdCollections%5B%5D=$movieId", $sc->root, $sc->cookiePath);
@@ -83,24 +90,29 @@ function parseMovie($title, $year, $rating) {
     global $stats;
     global $sc;
 
-    $stats->lines[] = $title;
-
     $scFindMovieURI = $sc->root."/recherche?query=".urlencode($title)."&filter=movies";
     $scFindResults = senscritiqueGet($scFindMovieURI, $sc->root, $sc->cookiePath);
 
-    $movieId = getMovieID($scFindResults['data'], $title, $year);
+    $movie = getMovie($scFindResults['data'], $title, $year, $rating);
 
-    if (!$movieId)
+    if (!$movie || !$movie->id)
         return $stats->notFound[] = $title;
 
+    $isSameTitle = $movie->foundtitle == $title || $movie->foundotitle == $title;
+    $isCloseYear = abs(intval($movie->foundyear) - intval($year)) < 2;
+    $movie->exactmatch = $isSameTitle && $isCloseYear;
+
+    // TODO : should be possible to get that from the find page, see @getMovie
     if(!$params->over)
-        $currRating = getCurrentRating($sc, $movieId);
+        $movie->currentRating = getCurrentRating($sc, $movie->id);
 
-    if(!$params->over && $currRating == $rating)
-        return $stats->skipped[] = $title;
+    if(!$params->over && $movie->currentRating)
+        return $stats->skipped[] = $movie;
 
-    $success = postRating($sc, $movieId, $rating);
-    if($success) $stats->updated[] = $title;
+    $success = postRating($sc, $movie->id, $rating);
+    if($success) return $stats->updated[] = $movie;
+
+    $stats->failed[] = $title;
 }
 
 
@@ -118,13 +130,13 @@ if($params->mail) {
     if (file_exists($sc->cookiePath)) {
         unlink($sc->cookiePath);
     }
-    $stats->failed = array_diff($stats->lines, $stats->updated, $stats->skipped, $stats->notFound);
 }
 ?>
 <!DOCTYPE html>
 <html>
 <title>imdb2senscritique</title>
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<style>span.alert{padding: 0 .25em;}</style>
 <body>
 <main class="container">
 <h1>imdb2senscritique</h1>
@@ -161,7 +173,7 @@ if($params->mail) {
     <div class="col-md-4">
       <label for="over">Overwrite</label>
       <div class="checkbox">
-        <label><input type="checkbox" name="over" checked=<?php echo $params->over; ?>> Overwrite existing ratings</label>
+        <label><input type="checkbox" name="over"<?php echo $params->over ? ' checked':'';?>> Overwrite existing ratings</label>
       </div></div>
   </div>
   <div class="form-group">
@@ -177,24 +189,53 @@ if($params->mail) {
 </form>
 <hr>
 <section>
-<?php if (count($stats->updated)): ?>
-    <p><strong>These titles where successfully updated</strong></p>
-    <ul><li><?php echo implode($stats->updated, '</li><li>'); ?></li></ul>
+<?php if ($count = count($stats->updated)): ?>
+    <p><strong><?php echo $count;?> titles where successfully updated</strong></p>
+    <ul><?php
+    foreach($stats->updated as $movie) {
+        $updateinfos = sprintf('<span class="alert alert-success">updated %s to %d</span>',
+            isset($movie->currentRating) ? 'from '.$movie->currentRating : '',
+            $movie->rating);
+        $originalinfos = sprintf('<span class="alert alert-warning">seems to be <em>%s</em> %s</span>',
+            $movie->title == $movie->foundtitle ? '' : $movie->title.',',
+            $movie->year);
+        printf('<li><a href="%s">%s (%s)</a> %s %s</li>',
+            $sc->root . $movie->path,
+            $movie->foundtitle,
+            $movie->foundyear,
+            $updateinfos,
+            $movie->exactmatch ? '' : $originalinfos
+        );
+    }?>
+    </ul>
 <?php endif; ?>
 
-<?php if (count($stats->skipped)): ?>
-    <p><strong>These titles where skipped because already rated</strong></p>
-    <ul><li><?php echo implode($stats->skipped, '</li><li>'); ?></li></ul>
+<?php if ($count = count($stats->skipped)): ?>
+    <p><strong><?php echo $count;?> titles where skipped because already rated</strong></p>
+    <ul><?php
+    foreach($stats->skipped as $movie)
+        printf('<li><a href="%s">%s (%s)</a> <span class="alert alert-info">already rated %d %s</span></li>',
+            $sc->root . $movie->path,
+            $movie->title, $movie->year,
+            $movie->currentRating,
+            $movie->rating != $movie->currentRating ? '(file rating is '. $movie->rating.')':'' ); ?>
+    </ul>
 <?php endif; ?>
 
-<?php if (count($stats->notFound)): ?>
-    <p><strong>These titles where not recognized</strong></p>
-    <ul><li><?php echo implode($stats->notFound, '</li><li>'); ?></li></ul>
+<?php if ($count = count($stats->notFound)):
+    $msg = ' <span class="alert alert-danger">not recognized</span>';?>
+    <p><strong><?php echo $count;?> titles where not recognized</strong></p>
+    <ul><li><span class="alert alert-error">
+        <?php echo implode($stats->notFound, $msg.'</li><li>'); echo $msg; ?>
+    </li></ul>
 <?php endif; ?>
 
-<?php if (count($stats->lines) && count($stats->failed)): ?>
-    <p><strong>These titles failed for unknown reasons</strong></p>
-    <ul><li><?php echo implode($stats->failed, '</li><li>'); ?></li></ul>
+<?php if ($count = count($stats->failed)):
+    $msg = ' <span class="alert alert-danger">unknown fail</span>';?>
+    <p><strong><?php echo $count;?> titles failed for unknown reasons</strong></p>
+    <ul><li>
+        <?php echo implode($stats->failed, $msg.'</li><li>'); echo $msg; ?>
+    </li></ul>
 <?php endif; ?>
 </section>
 </main>
