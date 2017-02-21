@@ -53,27 +53,29 @@ function parseCSV($path) {
     }
 }
 function getMovie($resultsPage, $title, $year, $rating) {
-    $item = str_get_html($resultsPage)->find('li.esco-item', 0);
-    if(!$item) return null;
+    $items = str_get_html($resultsPage)->find('li.esco-item');
+    foreach($items as $item) {
+        $thisTitle = html_entity_decode($item->find('a.elco-anchor',0)->plaintext, ENT_QUOTES);
+        $thisOTitle = html_entity_decode($item->find('p.elco-original-title',0)->plaintext, ENT_QUOTES);
+        $thisYear = substr(trim($item->find('span.elco-date',0)->plaintext), 1, -1);
 
-    $thisTitle = html_entity_decode($item->find('a.elco-anchor',0)->plaintext, ENT_QUOTES);
-    $thisOTitle = html_entity_decode($item->find('p.elco-original-title',0)->plaintext, ENT_QUOTES);
-    $thisYear = substr(trim($item->find('span.elco-date',0)->plaintext), 1, -1);
+        $isCloseYear = abs(intval($thisYear) - intval($year)) < 2;
+        if(!$isCloseYear) continue;
 
-    $movie = (object) array(
-        'title' => $title,
-        'year' => $year,
-        'rating' => $rating,
-        'id' => $item->getAttribute('data-sc-product-id'),
-        'foundtitle' => $thisTitle,
-        'foundotitle' => $thisOTitle,
-        'foundyear' => $thisYear ? $thisYear  : '???',
-        //'currentRating' => $item->find('span.erra-action-item', 0)->plaintext,
-        'path' => $item->find('a', 0)->href,
-        'img' => $item->find('img', 0),
-    );
-
-    return $movie;
+        return (object) array(
+            'title' => $title,
+            'year' => $year,
+            'rating' => $rating,
+            'exactmatch' => $thisTitle == $title || $thisOTitle == $title,
+            'id' => $item->getAttribute('data-sc-product-id'),
+            'foundtitle' => $thisTitle,
+            'foundotitle' => $thisOTitle,
+            'foundyear' => $thisYear ? $thisYear  : '???',
+            //'currentRating' => $item->find('span.erra-action-item', 0)->plaintext,
+            'path' => $item->find('a', 0)->href,
+            'img' => $item->find('img', 0),
+        );
+    }
 }
 function getCurrentRating($sc, $movieId) {
     $getUserActions = senscritiquePost($sc->root.$sc->actionsPath, "productIdCollections%5B%5D=$movieId", $sc->root, $sc->cookiePath);
@@ -94,17 +96,13 @@ function parseMovie($title, $year, $rating) {
     global $stats;
     global $sc;
 
-    $scFindMovieURI = $sc->root."/recherche?query=".urlencode($title)."&filter=movies";
+    $scFindMovieURI = $sc->root."/recherche?query=".urlencode(strtolower($title))."&filter=movies";
     $scFindResults = senscritiqueGet($scFindMovieURI, $sc->root, $sc->cookiePath);
 
     $movie = getMovie($scFindResults['data'], $title, $year, $rating);
 
     if (!$movie || !$movie->id)
         return $stats->notFound[] = $title;
-
-    $isSameTitle = $movie->foundtitle == $title || $movie->foundotitle == $title;
-    $isCloseYear = abs(intval($movie->foundyear) - intval($year)) < 2;
-    $movie->exactmatch = $isSameTitle && $isCloseYear;
 
     // TODO : should be possible to get that from the find page, see @getMovie
     if(!$params->over)
