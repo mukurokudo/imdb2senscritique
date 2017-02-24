@@ -5,7 +5,7 @@
  *
  * @param object $sc
  * @param string $path
- * @param array  $postedData
+ * @param string $postedData
  *
  * @return array HTTP code, CURL output & cookie path
  */
