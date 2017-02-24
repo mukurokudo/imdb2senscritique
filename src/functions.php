@@ -40,7 +40,27 @@ function parseCSV($path) {
         $curr++;
     }
 
+    fclose($fHandle);
+
     return $curr;
+}
+
+/**
+ * @param $path
+ * @return int
+ */
+function getCSVnbLines($path) {
+    if (!file_exists($path) || !($fHandle = fopen($path, 'r'))) {
+        return 0;
+    }
+    $nbLines = 0;
+    while (($row = fgetcsv($fHandle))) {
+        $nbLines++;
+    }
+
+    fclose($fHandle);
+
+    return $nbLines;
 }
 
 /**

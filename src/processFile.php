@@ -6,15 +6,24 @@ $filePath = 'movies.csv';
 $uploaded = isset($_FILES['file']['tmp_name']) ? $_FILES['file']['tmp_name'] : false;
 if($uploaded) move_uploaded_file($uploaded, $filePath);
 
+$requiredParams = array('mail', 'pswd', 'start', 'number');
+
+if (count(array_intersect_key(array_flip($requiredParams), $_POST)) !== count($requiredParams)) {
+    header('HTTP/1.1 400 Bad Request', true, 400);
+    exit;
+}
+
 $params = (object) array(
-    'mail' => isset($_POST['mail']) ? $_POST['mail'] : '',
-    'pswd' => isset($_POST['pswd']) ? $_POST['pswd'] : '',
+    'mail' => $_POST['mail'],
+    'pswd' => $_POST['pswd'],
     'over' => isset($_POST['over']) ? $_POST['over'] : '',
-    'start' => isset($_POST['start']) && $_POST['start'] > 0 ? $_POST['start'] : 1,
-    'nbr' => isset($_POST['number']) && $_POST['number'] > 0 ? $_POST['number'] : 100,
+    'start' => $_POST['start'] > 0 ? $_POST['start'] : 1,
+    'nbr' => $_POST['number'] > 0 ? $_POST['number'] : 100,
 );
 
-if(isset($_POST['action']) && $_POST['action'] === 'Next') $params->start += $params->nbr;
+$csvLines = getCSVnbLines($filePath);
+
+if(isset($_POST['action']) && $_POST['action'] === 'Next' && ($params->start+$params->nbr <= $csvLines)) $params->start += $params->nbr;
 
 $sc = (object) array(
     'root' => 'https://www.senscritique.com',
